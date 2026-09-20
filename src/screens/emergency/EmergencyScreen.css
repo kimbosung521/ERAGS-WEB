@@ -1,0 +1,60 @@
+.emergency-screen {
+  --border: #e4e9ef;
+  --muted: #637086;
+  --primary: #3364e0;
+  --danger: #bf2635;
+}
+
+.emergency-header { display: flex; align-items: center; gap: 24px; padding: 22px 28px; background: white; border-bottom: 1px solid var(--border); }
+.emergency-header strong { color: var(--primary); font-size: 24px; }
+.emergency-header small { margin-left: auto; color: var(--muted); }
+.emergency-content { max-width: 1680px; margin: auto; padding: 28px; }
+.emergency-intro { margin-bottom: 24px; }
+.emergency-intro h1 { font-size: clamp(22px, 3vw, 30px); margin-bottom: 8px; }
+.emergency-muted, .emergency-item time { color: var(--muted); font-size: 13px; }
+.emergency-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr) 340px; gap: 16px; align-items: stretch; }
+.emergency-layout > div { min-width: 0; }
+.emergency-panel { height: 100%; padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: white; }
+.emergency-panel h2 { margin-bottom: 20px; font-size: 18px; }
+.emergency-panel h2 small { margin-left: 8px; font-size: 12px; color: var(--muted); }
+.emergency-list { display: grid; gap: 10px; list-style: none; padding: 0; margin: 0; }
+.emergency-item { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px; text-align: left; border: 1px solid var(--border); border-radius: 8px; color: inherit; background: white; overflow-wrap: anywhere; }
+.emergency-item[aria-pressed='true'] { border-color: var(--primary); background: #f1f5ff; }
+.emergency-status { display: inline-block; padding: 4px 8px; border-radius: 5px; font-size: 12px; font-weight: 600; }
+.emergency-status.unconfirmed { color: var(--danger); background: #fff0f1; }
+.emergency-status.responding { color: var(--primary); background: #edf2ff; }
+.emergency-map-panel { display: flex; flex-direction: column; gap: 16px; }
+.emergency-map-panel h2 { margin-bottom: 0; }
+.emergency-map { position: relative; min-height: 420px; flex: 1; overflow: hidden; border-radius: 8px; background: #e2eae2; }
+
+.emergency-pin { width: 44px; height: 44px; border: 3px solid white; border-radius: 50%; color: white; font-weight: 700; background: var(--primary); }
+.emergency-pin.unconfirmed { background: var(--danger); }
+.emergency-pin[aria-pressed='true'] { box-shadow: 0 0 0 7px #18233725; }
+.emergency-detail-summary { display: grid; justify-items: start; gap: 12px; padding: 16px; border-radius: 8px; background: #f5f7fa; }
+.emergency-detail-summary h3 { font-size: 22px; }
+.emergency-fields { margin: 20px 0 0; }
+.emergency-fields > div { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.emergency-fields dt { color: var(--muted); }
+.emergency-fields dd { margin: 0; overflow-wrap: anywhere; }
+.emergency-detail-slot:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; border-radius: 12px; }
+.emergency-disclaimer { margin-top: 20px; color: var(--muted); font-size: 12px; }
+.emergency-mobile-controls, .emergency-mobile-detail-link { display: none; }
+
+@media (max-width: 1199px) {
+  .emergency-layout { grid-template-columns: 300px minmax(0, 1fr); }
+  .emergency-detail-slot { grid-column: 1 / -1; }
+}
+
+@media (max-width: 767px) {
+  .emergency-header { padding: 16px; gap: 12px; font-size: 12px; }
+  .emergency-header strong { font-size: 21px; }
+  .emergency-content { padding: 20px 16px; }
+  .emergency-layout { grid-template-columns: minmax(0, 1fr); }
+  .emergency-mobile-controls { display: flex; gap: 8px; margin-bottom: 16px; }
+  .emergency-mobile-controls button, .emergency-mobile-detail-link { min-height: 44px; padding: 10px 16px; border: 1px solid var(--border); border-radius: 8px; background: white; color: inherit; }
+  .emergency-mobile-controls button { flex: 1; }
+  .emergency-mobile-controls button[aria-pressed='true'] { background: var(--primary); color: white; }
+  .emergency-layout[data-active-tab='list'] .emergency-map-slot,
+  .emergency-layout[data-active-tab='map'] .emergency-list-slot { display: none; }
+  .emergency-mobile-detail-link { display: block; color: var(--primary); }
+}
