@@ -5,9 +5,11 @@
   --danger: #bf2635;
 }
 
-.emergency-header { display: flex; align-items: center; gap: 24px; padding: 22px 28px; background: white; border-bottom: 1px solid var(--border); }
+.emergency-header { display: flex; flex-wrap: wrap; align-items: center; gap: 24px; padding: 22px 28px; background: white; border-bottom: 1px solid var(--border); }
 .emergency-header strong { color: var(--primary); font-size: 24px; }
 .emergency-header small { margin-left: auto; color: var(--muted); }
+.emergency-logout { min-height: 44px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; color: var(--primary); background: white; font-size: 14px; white-space: nowrap; }
+.emergency-logout:hover { background: #f1f5ff; }
 .emergency-content { max-width: 1680px; margin: auto; padding: 28px; }
 .emergency-intro { margin-bottom: 24px; }
 .emergency-intro h1 { font-size: clamp(22px, 3vw, 30px); margin-bottom: 8px; }

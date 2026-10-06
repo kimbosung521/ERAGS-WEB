@@ -5,7 +5,11 @@ import EmergencyMap from './components/EmergencyMap'
 import { mockEmergencies } from './emergency.mock'
 import './EmergencyScreen.css'
 
-export default function EmergencyScreen() {
+interface Props {
+  onLogout: () => void
+}
+
+export default function EmergencyScreen({ onLogout }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(mockEmergencies[0]?.id ?? null)
   const [activeTab, setActiveTab] = useState<'list' | 'map'>('list')
   const detailRef = useRef<HTMLDivElement>(null)
@@ -23,6 +27,7 @@ export default function EmergencyScreen() {
     <div className="emergency-screen">
       <header className="emergency-header">
         <strong>ERAGS</strong><span>위급상황 관제</span><small>데모 데이터</small>
+        <button className="emergency-logout" type="button" onClick={onLogout}>로그아웃</button>
       </header>
       <main className="emergency-content">
         <div className="emergency-intro">
