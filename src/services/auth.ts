@@ -7,6 +7,12 @@ export function clearAdminSession(): void {
   sessionStorage.removeItem(AUTH_SESSION_KEY)
 }
 
+export function getAdminAccessToken(): string | null {
+  if (getAdminSessionExpiresAt() === null) return null
+  const session: unknown = JSON.parse(sessionStorage.getItem(AUTH_SESSION_KEY) ?? 'null')
+  return isRecord(session) && typeof session.access_token === 'string' ? session.access_token : null
+}
+
 export function getAdminSessionExpiresAt(): number | null {
   try {
     const storedSession = sessionStorage.getItem(AUTH_SESSION_KEY)

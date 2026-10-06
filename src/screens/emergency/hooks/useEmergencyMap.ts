@@ -20,23 +20,24 @@ export function useEmergencyMap(
     let cleanup = () => {}
     loadKakaoMaps().then((maps) => {
       if (isCancelled) return
-      const initial = emergencies[0]?.location ?? { latitude: 37.5563, longitude: 126.9236 }
+      const initial = emergencies.find((emergency) => emergency.location)?.location ?? { latitude: 37.5563, longitude: 126.9236 }
       const map = new maps.Map(container, {
         center: new maps.LatLng(initial.latitude, initial.longitude), level: 5,
       })
       mapRef.current = map
-      const overlays = emergencies.map((emergency, index) => {
+      const overlays = emergencies.flatMap((emergency, index) => {
+        if (!emergency.location) return []
         const button = document.createElement('button')
         button.type = 'button'
         button.className = `emergency-pin ${emergency.status}`
         button.textContent = String(index + 1)
-        button.setAttribute('aria-label', `${emergency.person.name}, ${emergency.category}, ${emergencyStatusLabels[emergency.status]}`)
+        button.setAttribute('aria-label', `${emergency.person?.name ?? emergency.id}, ${emergency.category}, ${emergencyStatusLabels[emergency.status]}`)
         button.onclick = () => handleSelect(emergency.id)
         const overlay = new maps.CustomOverlay({
           map, content: button, yAnchor: 0.5,
           position: new maps.LatLng(emergency.location.latitude, emergency.location.longitude),
         })
-        return { id: emergency.id, button, overlay }
+        return [{ id: emergency.id, button, overlay }]
       })
       markersRef.current = overlays.map(({ id, button, overlay }) => ({
         id, button, setZIndex: (index: number) => overlay.setZIndex(index),
@@ -73,7 +74,7 @@ export function useEmergencyMap(
       marker.setZIndex(isSelected ? 1 : 0)
     })
     const selected = emergencies.find((emergency) => emergency.id === selectedId)
-    if (selected) map.setCenter(new maps.LatLng(selected.location.latitude, selected.location.longitude))
+    if (selected?.location) map.setCenter(new maps.LatLng(selected.location.latitude, selected.location.longitude))
   }, [emergencies, selectedId, isReady])
   return { containerRef, isReady, error }
 }

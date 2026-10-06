@@ -14,12 +14,10 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
-export async function postJson(path: string, body: unknown): Promise<unknown> {
+async function requestJson(path: string, init: RequestInit): Promise<unknown> {
   const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '')
   const response = await fetch(`${baseUrl}${path}`, {
-    method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    ...init,
   })
   let payload: unknown
   try {
@@ -38,4 +36,20 @@ export async function postJson(path: string, body: unknown): Promise<unknown> {
     )
   }
   return payload
+}
+
+export function postJson(path: string, body: unknown): Promise<unknown> {
+  return requestJson(path, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+export function authenticatedFetch(path: string, accessToken: string, signal?: AbortSignal): Promise<unknown> {
+  return requestJson(path, {
+    method: 'GET',
+    headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` },
+    signal,
+  })
 }

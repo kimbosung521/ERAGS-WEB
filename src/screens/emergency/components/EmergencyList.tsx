@@ -5,13 +5,14 @@ interface Props {
   emergencies: readonly Emergency[]
   selectedId: string | null
   onSelect: (id: string) => void
+  hasLoaded?: boolean
 }
 
-export default function EmergencyList({ emergencies, selectedId, onSelect }: Props) {
+export default function EmergencyList({ emergencies, selectedId, onSelect, hasLoaded = true }: Props) {
   return (
     <section className="emergency-panel" aria-labelledby="emergency-list-heading">
       <h2 id="emergency-list-heading">위급상황 목록 <small>{emergencies.length}건</small></h2>
-      {emergencies.length === 0 && <p>접수된 위급상황이 없습니다.</p>}
+      {hasLoaded && emergencies.length === 0 && <p>접수된 위급상황이 없습니다.</p>}
       <ul className="emergency-list">
         {emergencies.map((emergency) => (
           <li key={emergency.id}>
@@ -24,9 +25,9 @@ export default function EmergencyList({ emergencies, selectedId, onSelect }: Pro
                 {emergencyStatusLabels[emergency.status]}
               </span>
               <strong>{emergency.category}</strong>
-              <span>{emergency.person.name} · {emergency.person.age}세</span>
+              <span>{emergency.person ? `${emergency.person.name} · ${emergency.person.age}세` : emergency.id}</span>
               <span className="emergency-muted">{emergency.address}</span>
-              <time dateTime={emergency.occurredAt}>{emergency.occurredAt.slice(11, 19)} 접수</time>
+              <time dateTime={emergency.occurredAt}>{new Date(emergency.occurredAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} 접수</time>
             </button>
           </li>
         ))}
