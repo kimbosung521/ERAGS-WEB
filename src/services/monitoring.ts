@@ -1,5 +1,5 @@
 import { ApiRequestError, authenticatedFetch, getJson, isRecord } from './api'
-import { getAdminAccessToken } from './auth'
+import { withAdminToken } from './auth'
 import type {
   Emergency, EmergencyIncidentDetail, EmergencyListResult, EmergencyStatus, MonitoringIncidentFilter, MonitoringSupply,
 } from '../types/emergency'
@@ -88,16 +88,9 @@ function parseIncident(value: unknown, categoryLabels: Record<string, string>): 
   }
 }
 
-function requireAccessToken(): string {
-  const accessToken = getAdminAccessToken()
-  if (!accessToken) throw new ApiRequestError(401, '로그인이 필요합니다.', 'AUTH_REQUIRED')
-  return accessToken
-}
-
 export async function getMonitoringIncidents(
   filter: MonitoringIncidentFilter = DEFAULT_MONITORING_FILTER, offset = 0, signal?: AbortSignal,
 ): Promise<EmergencyListResult> {
-  const accessToken = requireAccessToken()
   const query = new URLSearchParams({ status: filter.status, limit: String(MONITORING_PAGE_SIZE), offset: String(offset) })
   if (filter.from) query.set('from', filter.from)
   if (filter.to) query.set('to', filter.to)
@@ -116,7 +109,7 @@ export async function getMonitoringIncidents(
     )
   }
   const [payload, categoryLabels] = await Promise.all([
-    authenticatedFetch(`/api/v1/monitoring/incidents?${query}`, accessToken, signal),
+    withAdminToken((accessToken) => authenticatedFetch(`/api/v1/monitoring/incidents?${query}`, accessToken, signal)),
     loadCategoryLabelsWithin(CATEGORY_LABELS_TIMEOUT_MS),
   ])
   if (!isRecord(payload) || payload.success !== true || !isRecord(payload.data)) return invalidResponse()
@@ -237,14 +230,13 @@ function parseIncidentDetail(value: unknown, categoryLabels: Record<string, stri
 }
 
 export async function getMonitoringIncident(incidentId: string, signal?: AbortSignal): Promise<EmergencyIncidentDetail> {
-  const accessToken = requireAccessToken()
   const path = `/api/v1/monitoring/incidents/${encodeURIComponent(incidentId)}`
   if (incidentId !== lastLoggedIncidentId) {
     lastLoggedIncidentId = incidentId
     console.info(`[monitoring] 사건 상세 조회 요청\n  incidentId=${incidentId}\n  GET ${path}`)
   }
   const [payload, categoryLabels] = await Promise.all([
-    authenticatedFetch(path, accessToken, signal),
+    withAdminToken((accessToken) => authenticatedFetch(path, accessToken, signal)),
     loadCategoryLabelsWithin(CATEGORY_LABELS_TIMEOUT_MS),
   ])
   if (!isRecord(payload) || payload.success !== true) return invalidResponse('사건 상세')

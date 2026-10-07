@@ -42,7 +42,11 @@ function setup({ status = 200, contentType = 'text/event-stream', chunks = [], j
   }
   const api = load('src/services/api.ts')
   const events = load('src/services/monitoringEvents.ts', {
-    './api': api, './auth': { getAdminAccessToken: () => hasSession ? 'test-access' : null },
+    './api': api, './auth': {
+      withAdminToken: (request) => hasSession
+        ? request('test-access')
+        : Promise.reject(new api.ApiRequestError(401, '로그인이 필요합니다.', 'AUTH_REQUIRED')),
+    },
   })
   return { ...events, requests, warnings }
 }

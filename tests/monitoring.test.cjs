@@ -39,7 +39,11 @@ function setup(payload, {
   }
   const api = load('src/services/api.ts')
   const monitoring = load('src/services/monitoring.ts', {
-    './api': api, './auth': { getAdminAccessToken: () => hasSession ? 'test-access' : null },
+    './api': api, './auth': {
+      withAdminToken: (request) => hasSession
+        ? request('test-access')
+        : Promise.reject(new api.ApiRequestError(401, '로그인이 필요합니다.', 'AUTH_REQUIRED')),
+    },
   })
   return { ...monitoring, requests, categoryRequests }
 }

@@ -1,5 +1,5 @@
-import { ApiRequestError, authenticatedStream, isRecord } from './api'
-import { getAdminAccessToken } from './auth'
+import { authenticatedStream, isRecord } from './api'
+import { withAdminToken } from './auth'
 
 export interface MonitoringGuideEvent {
   eventId: number
@@ -77,10 +77,10 @@ export async function streamMonitoringEvents({ lastEventId, signal, onOpen, onEv
   onOpen?: () => void
   onEvent: (event: MonitoringGuideEvent) => void
 }): Promise<void> {
-  const accessToken = getAdminAccessToken()
-  if (!accessToken) throw new ApiRequestError(401, '로그인이 필요합니다.', 'AUTH_REQUIRED')
   console.info(`[monitoring] 실시간 이벤트 연결 요청\n  Last-Event-ID=${lastEventId}\n  GET /api/v1/monitoring/events`)
-  const body = await authenticatedStream('/api/v1/monitoring/events', accessToken, { 'Last-Event-ID': String(lastEventId) }, signal)
+  const body = await withAdminToken((accessToken) => (
+    authenticatedStream('/api/v1/monitoring/events', accessToken, { 'Last-Event-ID': String(lastEventId) }, signal)
+  ))
   onOpen?.()
 
   const parser = createSseParser((message) => {

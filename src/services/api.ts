@@ -56,11 +56,12 @@ async function requestJson(path: string, init: RequestInit): Promise<unknown> {
   return payload
 }
 
-export function postJson(path: string, body: unknown): Promise<unknown> {
+export function postJson(path: string, body: unknown, options: { keepalive?: boolean } = {}): Promise<unknown> {
   return requestJson(path, {
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    ...options,
   })
 }
 
