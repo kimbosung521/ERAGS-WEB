@@ -20,6 +20,7 @@ const errorMessages: Record<string, string> = {
   FORBIDDEN: '관제 권한이 없는 계정입니다.',
   HTTPS_REQUIRED: '보안 연결(HTTPS)로 접속해야 합니다.',
   INVALID_REQUEST: '요청 값이 올바르지 않습니다.',
+  INCIDENT_NOT_FOUND: '해당 사건을 찾을 수 없습니다.',
 }
 
 function toRequestError(status: number, payload: unknown): ApiRequestError {

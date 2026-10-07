@@ -1,6 +1,8 @@
 import { ApiRequestError, authenticatedFetch, getJson, isRecord } from './api'
 import { getAdminAccessToken } from './auth'
-import type { Emergency, EmergencyListResult, EmergencyStatus, MonitoringIncidentFilter } from '../types/emergency'
+import type {
+  Emergency, EmergencyIncidentDetail, EmergencyListResult, EmergencyStatus, MonitoringIncidentFilter, MonitoringSupply,
+} from '../types/emergency'
 
 const statuses: Record<string, EmergencyStatus> = {
   NEW: 'unconfirmed', ACKNOWLEDGED: 'acknowledged', RESPONDING: 'responding', CLOSED: 'closed',
@@ -11,8 +13,9 @@ export const DEFAULT_MONITORING_FILTER: MonitoringIncidentFilter = { status: 'AC
 const CATEGORY_LABELS_TIMEOUT_MS = 2_000
 
 let categoryLabelsRequest: Promise<Record<string, string>> | null = null
-// 백엔드 확인용 요청 로그. 5초 자동 갱신마다 찍히지 않도록 조회 조건이 바뀔 때만 남긴다.
+// 백엔드 확인용 요청 로그. 5초 자동 갱신마다 찍히지 않도록 목록은 조회 조건이, 상세는 선택한 사건이 바뀔 때만 남긴다.
 let lastLoggedQuery: string | null = null
+let lastLoggedIncidentId: string | null = null
 
 // 라벨은 표시용이므로 조회에 실패해도 목록은 코드로 보여주고, 다음 조회 때 다시 시도한다.
 function loadCategoryLabels(): Promise<Record<string, string>> {
@@ -40,8 +43,8 @@ function loadCategoryLabelsWithin(timeoutMs: number): Promise<Record<string, str
   return Promise.race([loadCategoryLabels(), timeout]).finally(() => clearTimeout(timeoutId))
 }
 
-function invalidResponse(): never {
-  throw new ApiRequestError(200, '사건 목록 응답 형식이 올바르지 않습니다.', 'INVALID_RESPONSE')
+function invalidResponse(target = '사건 목록'): never {
+  throw new ApiRequestError(200, `${target} 응답 형식이 올바르지 않습니다.`, 'INVALID_RESPONSE')
 }
 
 function isNonNegativeInteger(value: unknown): value is number {
@@ -85,11 +88,16 @@ function parseIncident(value: unknown, categoryLabels: Record<string, string>): 
   }
 }
 
+function requireAccessToken(): string {
+  const accessToken = getAdminAccessToken()
+  if (!accessToken) throw new ApiRequestError(401, '로그인이 필요합니다.', 'AUTH_REQUIRED')
+  return accessToken
+}
+
 export async function getMonitoringIncidents(
   filter: MonitoringIncidentFilter = DEFAULT_MONITORING_FILTER, offset = 0, signal?: AbortSignal,
 ): Promise<EmergencyListResult> {
-  const accessToken = getAdminAccessToken()
-  if (!accessToken) throw new ApiRequestError(401, '로그인이 필요합니다.', 'AUTH_REQUIRED')
+  const accessToken = requireAccessToken()
   const query = new URLSearchParams({ status: filter.status, limit: String(MONITORING_PAGE_SIZE), offset: String(offset) })
   if (filter.from) query.set('from', filter.from)
   if (filter.to) query.set('to', filter.to)
@@ -130,5 +138,120 @@ export async function getMonitoringIncidents(
   return {
     items, invalidCount, total: data.total, nextOffset: data.nextOffset,
     fetchedAt: data.fetchedAt, eventCursor: data.eventCursor,
+  }
+}
+
+// 상세 응답은 사건 하나라서 일부만 보여주면 처치 상황을 잘못 읽을 수 있으므로, 형식이 어긋나면 전체를 오류로 처리한다.
+class InvalidDetail extends Error {}
+
+function check(condition: unknown): asserts condition {
+  if (!condition) throw new InvalidDetail()
+}
+
+function isDate(value: unknown): value is string {
+  return typeof value === 'string' && Number.isFinite(Date.parse(value))
+}
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === 'string'
+}
+
+function isNullableNumber(value: unknown): value is number | null {
+  return value === null || (typeof value === 'number' && Number.isFinite(value))
+}
+
+function stringArray(value: unknown): string[] {
+  check(Array.isArray(value) && value.every((item) => typeof item === 'string'))
+  return value
+}
+
+function supplies(value: unknown): MonitoringSupply[] {
+  check(Array.isArray(value))
+  return value.map((supply) => {
+    check(isRecord(supply) && isNullableNumber(supply.itemId) && isNullableString(supply.itemName) && isNullableNumber(supply.quantity))
+    return { itemId: supply.itemId, itemName: supply.itemName, quantity: supply.quantity }
+  })
+}
+
+function parseDetailLocation(value: unknown): EmergencyIncidentDetail['location'] {
+  if (value === null) return null
+  check(isRecord(value) && typeof value.status === 'string' && isDate(value.observedAt) && isDate(value.receivedAt))
+  const { latitude, longitude, accuracy } = value
+  check(isNullableNumber(latitude) && isNullableNumber(longitude) && isNullableNumber(accuracy))
+  // 좌표는 둘 다 있거나 둘 다 없어야 지도에 잘못 찍지 않는다.
+  check((latitude === null) === (longitude === null))
+  check(latitude === null || longitude === null || (Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180))
+  return { status: value.status, latitude, longitude, accuracy, observedAt: value.observedAt, receivedAt: value.receivedAt }
+}
+
+function parseIncidentDetail(value: unknown, categoryLabels: Record<string, string>): EmergencyIncidentDetail {
+  check(isRecord(value) && typeof value.incidentId === 'string' && value.incidentId.trim())
+  check(typeof value.status === 'string' && Object.hasOwn(statuses, value.status))
+  check(isNonNegativeInteger(value.revision) && isDate(value.updatedAt))
+
+  const { guide, progress } = value
+  check(isRecord(guide) && typeof guide.kind === 'string' && isDate(guide.createdAt) && isDate(guide.generatedAt))
+  check(typeof guide.generationStatus === 'string' && typeof guide.ageGroup === 'string')
+  check(Array.isArray(guide.injuries) && Array.isArray(guide.execution))
+  const injuries = guide.injuries.map((injury: unknown) => {
+    check(isRecord(injury) && typeof injury.injuryId === 'string' && typeof injury.categoryCode === 'string')
+    check(isNullableString(injury.subtypeCode) && typeof injury.severityCode === 'string')
+    check(isNullableString(injury.summary) && typeof injury.disposition === 'string')
+    return {
+      injuryId: injury.injuryId,
+      category: Object.hasOwn(categoryLabels, injury.categoryCode) ? categoryLabels[injury.categoryCode] : injury.categoryCode,
+      subtypeCode: injury.subtypeCode, severityCode: injury.severityCode, summary: injury.summary, disposition: injury.disposition,
+    }
+  })
+  const execution = guide.execution.map((step: unknown) => {
+    check(isRecord(step) && typeof step.executionStepId === 'string' && typeof step.instruction === 'string')
+    return { executionStepId: step.executionStepId, instruction: step.instruction, supplies: supplies(step.supplies) }
+  })
+
+  check(isRecord(progress) && typeof progress.source === 'string' && isNullableString(progress.status))
+  check(isNullableString(progress.currentStepId) && isNullableString(progress.blockedReason))
+
+  check(Array.isArray(value.history))
+  const history = value.history.map((entry: unknown) => {
+    check(isRecord(entry) && typeof entry.status === 'string' && Object.hasOwn(statuses, entry.status))
+    check(isDate(entry.at) && typeof entry.actorId === 'string' && isNullableString(entry.reason))
+    return { status: statuses[entry.status], at: entry.at, actorId: entry.actorId, reason: entry.reason }
+  })
+
+  return {
+    id: value.incidentId, status: statuses[value.status], revision: value.revision, updatedAt: value.updatedAt,
+    guide: {
+      kind: guide.kind, createdAt: guide.createdAt, generatedAt: guide.generatedAt,
+      generationStatus: guide.generationStatus, ageGroup: guide.ageGroup,
+      redFlags: stringArray(guide.redFlags), blockedReasons: stringArray(guide.blockedReasons), injuries, execution,
+    },
+    location: parseDetailLocation(value.location),
+    progress: {
+      source: progress.source, status: progress.status,
+      currentStepId: progress.currentStepId, blockedReason: progress.blockedReason,
+      completedStepIds: stringArray(progress.completedStepIds),
+      usedSupplies: progress.usedSupplies === null ? null : supplies(progress.usedSupplies),
+    },
+    history,
+  }
+}
+
+export async function getMonitoringIncident(incidentId: string, signal?: AbortSignal): Promise<EmergencyIncidentDetail> {
+  const accessToken = requireAccessToken()
+  const path = `/api/v1/monitoring/incidents/${encodeURIComponent(incidentId)}`
+  if (incidentId !== lastLoggedIncidentId) {
+    lastLoggedIncidentId = incidentId
+    console.info(`[monitoring] 사건 상세 조회 요청\n  incidentId=${incidentId}\n  GET ${path}`)
+  }
+  const [payload, categoryLabels] = await Promise.all([
+    authenticatedFetch(path, accessToken, signal),
+    loadCategoryLabelsWithin(CATEGORY_LABELS_TIMEOUT_MS),
+  ])
+  if (!isRecord(payload) || payload.success !== true) return invalidResponse('사건 상세')
+  try {
+    return parseIncidentDetail(payload.data, categoryLabels)
+  } catch (error) {
+    if (error instanceof InvalidDetail) return invalidResponse('사건 상세')
+    throw error
   }
 }

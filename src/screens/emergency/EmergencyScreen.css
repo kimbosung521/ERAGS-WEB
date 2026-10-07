@@ -109,6 +109,15 @@
 .emergency-fields > div { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
 .emergency-fields dt { color: var(--muted); }
 .emergency-fields dd { margin: 0; overflow-wrap: anywhere; }
+.emergency-detail-section { margin-top: 20px; }
+.emergency-detail-section h3 { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; font-size: 15px; }
+.emergency-detail-section h3 small { font-weight: 400; }
+.emergency-detail-list { display: grid; gap: 8px; margin: 0; padding-left: 20px; font-size: 14px; }
+.emergency-detail-list p { margin: 4px 0 0; overflow-wrap: anywhere; }
+.emergency-detail-list .step-done { color: var(--muted); }
+.emergency-detail-list .step-current { font-weight: 600; }
+.emergency-step-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; color: var(--primary); background: #edf2ff; font-size: 11px; }
+.emergency-detail-note { margin-top: 20px; }
 .emergency-detail-slot:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; border-radius: 12px; }
 .emergency-disclaimer { margin-top: 20px; color: var(--muted); font-size: 12px; }
 .emergency-mobile-controls, .emergency-mobile-detail-link { display: none; }

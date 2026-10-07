@@ -3,6 +3,7 @@ import EmergencyDetail from './components/EmergencyDetail'
 import EmergencyFilter from './components/EmergencyFilter'
 import EmergencyList from './components/EmergencyList'
 import EmergencyMap from './components/EmergencyMap'
+import { useEmergencyDetail } from './hooks/useEmergencyDetail'
 import { useEmergencyList } from './hooks/useEmergencyList'
 import { ApiRequestError } from '../../services/api'
 import { MONITORING_PAGE_SIZE } from '../../services/monitoring'
@@ -23,11 +24,12 @@ export default function EmergencyScreen({ onLogout }: Props) {
   const detailRef = useRef<HTMLDivElement>(null)
   const selectedEmergency = emergencies.find((emergency) => emergency.id === selectedId) ?? emergencies[0] ?? null
   const activeId = selectedEmergency?.id ?? null
+  const { detail, isLoading: isDetailLoading, error: detailError } = useEmergencyDetail(activeId)
 
   // 토큰 누락·만료(401)는 다시 로그인해야 하므로 로그인 화면으로 보낸다.
   useEffect(() => {
-    if (error instanceof ApiRequestError && error.status === 401) onLogout()
-  }, [error, onLogout])
+    if ([error, detailError].some((reason) => reason instanceof ApiRequestError && reason.status === 401)) onLogout()
+  }, [error, detailError, onLogout])
 
   function handleSelect(id: string) {
     setSelectedId(id)
@@ -93,10 +95,10 @@ export default function EmergencyScreen({ onLogout }: Props) {
             {selectedEmergency ? `${selectedEmergency.person?.name ?? selectedEmergency.id} 상세 정보 보기 ↓` : '선택된 상황 없음'}
           </button>
           <div className="emergency-detail-slot" ref={detailRef} tabIndex={-1}>
-            <EmergencyDetail emergency={selectedEmergency} />
+            <EmergencyDetail emergency={selectedEmergency} detail={detail} isLoading={isDetailLoading} error={detailError} />
           </div>
         </div>
-        <p className="emergency-disclaimer">목록 응답 기준 정보입니다. 이름·연락처는 관제 API에서 제공되지 않습니다. 목록은 5초마다 자동 갱신되며, 상세 API는 아직 연결되지 않았습니다.</p>
+        <p className="emergency-disclaimer">목록과 선택한 사건의 상세는 5초마다 자동 갱신됩니다. 이름·연락처는 관제 API에서 제공되지 않습니다.</p>
       </main>
     </div>
   )

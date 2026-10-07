@@ -226,3 +226,98 @@ test('선택한 상태와 기간을 쿼리로 보내고 비어 있는 기간은 
   assert.equal(first.get('to'), '2026-10-03T23:59:59+09:00')
   assert.equal(service.requests[1].url, 'https://api.example.com/api/v1/monitoring/incidents?status=ALL&limit=50&offset=50')
 })
+
+function detailResponse() {
+  return {
+    success: true,
+    data: {
+      incidentId: 'test/compound', status: 'RESPONDING', revision: 2, updatedAt: '2026-10-03T08:00:00Z',
+      guide: {
+        sessionId: 'test/compound', kind: 'COMPOUND', createdAt: '2026-10-03T08:00:00Z', generatedAt: '2026-10-03T08:00:01Z',
+        generationStatus: 'COMPLETE', ageGroup: 'ADULT', call119Required: true, redFlags: ['TEST_ONLY_RISK'], blockedReasons: [],
+        injuries: [{
+          injuryId: 'bleeding-1', categoryCode: 'BLEEDING', subtypeCode: 'BLEEDING_SEVERE', severityCode: 'HIGH', summary: null,
+          redFlags: [], reasons: [], missingInputs: [], disposition: 'ACTIVE', steps: [],
+        }],
+        execution: [{
+          executionStepId: 'plan:1', instruction: '시험용 단계', sources: [{ injuryId: 'bleeding-1', stepId: 101 }],
+          supplies: [{ itemId: 1, itemName: '시험용 거즈', quantity: 2 }],
+        }],
+      },
+      location: {
+        status: 'AVAILABLE', latitude: 37.55, longitude: 126.93, accuracy: 20,
+        observedAt: '2026-10-03T08:00:00Z', receivedAt: '2026-10-03T08:00:01Z',
+      },
+      progress: {
+        source: 'COMPOUND_SERVER', status: 'IN_PROGRESS', revision: 1, currentStepId: 'plan:1', blockedReason: null,
+        completedStepIds: [], heldInjuries: [], usedSupplies: [{ itemId: 1, itemName: '시험용 거즈', quantity: null }], records: [],
+      },
+      history: [{ status: 'ACKNOWLEDGED', at: '2026-10-03T08:00:00Z', actorId: '1', reason: null }],
+    },
+  }
+}
+
+test('사건 상세는 incidentId를 경로에 인코딩해 Bearer 인증으로 요청한다', async () => {
+  const service = setup(detailResponse())
+  const signal = new AbortController().signal
+  const detail = await service.getMonitoringIncident('test/compound', signal)
+  const request = service.requests[0]
+  assert.equal(request.url, 'https://api.example.com/api/v1/monitoring/incidents/test%2Fcompound')
+  assert.equal(request.init.method, 'GET')
+  assert.equal(request.init.headers.Authorization, 'Bearer test-access')
+  assert.equal(request.init.signal, signal)
+  assert.equal(detail.id, 'test/compound')
+  assert.equal(detail.status, 'responding')
+  assert.equal(detail.revision, 2)
+  assert.equal(detail.history[0].status, 'acknowledged')
+  assert.equal(detail.guide.execution[0].supplies[0].quantity, 2)
+  assert.equal(detail.progress.usedSupplies[0].quantity, null)
+  assert.equal(detail.location.accuracy, 20)
+})
+
+test('사건 상세의 사용 기록 미확인(null)과 위치 보고 전(null)을 그대로 유지한다', async () => {
+  const payload = detailResponse()
+  payload.data.progress = {
+    source: 'UNKNOWN', status: null, revision: null, currentStepId: null, blockedReason: null,
+    completedStepIds: [], heldInjuries: [], usedSupplies: null, records: [],
+  }
+  payload.data.location = null
+  const detail = await setup(payload).getMonitoringIncident('test/compound')
+  assert.equal(detail.progress.usedSupplies, null)
+  assert.equal(detail.progress.source, 'UNKNOWN')
+  assert.equal(detail.location, null)
+})
+
+test('사건 상세의 손상 카테고리를 대분류 이름으로 표시한다', async () => {
+  const service = setup(detailResponse(), { categories: { success: true, data: [{ category_code: 'BLEEDING', category_name: '출혈' }] } })
+  assert.equal((await service.getMonitoringIncident('test/compound')).guide.injuries[0].category, '출혈')
+})
+
+test('없는 사건(404)은 안내 문구와 코드를 보존한다', async () => {
+  const service = setup({ success: false, error: { code: 'INCIDENT_NOT_FOUND', message: 'INCIDENT_NOT_FOUND', details: [] } }, { status: 404 })
+  await assert.rejects(service.getMonitoringIncident('missing'), (error) => (
+    error.status === 404 && error.errorCode === 'INCIDENT_NOT_FOUND' && error.message === '해당 사건을 찾을 수 없습니다.'
+  ))
+})
+
+test('사건 상세 형식이 잘못되면 일부만 보여주지 않고 오류로 처리한다', async () => {
+  for (const mutate of [
+    (data) => { data.status = 'toString' },
+    (data) => { data.revision = -1 },
+    (data) => { data.guide.execution = null },
+    (data) => { data.progress.completedStepIds = [1] },
+    (data) => { data.location.longitude = null },
+    (data) => { data.history = [{ status: 'NEW', at: 'invalid', actorId: '1', reason: null }] },
+  ]) {
+    const payload = detailResponse()
+    mutate(payload.data)
+    await assert.rejects(setup(payload).getMonitoringIncident('test/compound'), (error) => error.errorCode === 'INVALID_RESPONSE')
+  }
+  await assert.rejects(setup({ success: true }).getMonitoringIncident('x'), (error) => error.errorCode === 'INVALID_RESPONSE')
+})
+
+test('세션이 없으면 상세도 네트워크 요청 전에 인증 오류를 반환한다', async () => {
+  const service = setup(detailResponse(), { hasSession: false })
+  await assert.rejects(service.getMonitoringIncident('x'), (error) => error.status === 401 && error.errorCode === 'AUTH_REQUIRED')
+  assert.equal(service.requests.length, 0)
+})
