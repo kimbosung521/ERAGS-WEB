@@ -59,5 +59,10 @@ export function useEmergencyList() {
     handleLoad(0, filter)
   }
 
-  return { data, isLoading, error, offset: request.offset, filter: request.filter, handleLoad, handleFilterChange }
+  // 실시간 이벤트를 받았을 때 같은 조건으로 바로 다시 조회한다. 보던 목록은 지우지 않고 로딩 표시도 하지 않는다.
+  function refresh() {
+    setRequest((current) => ({ ...current, revision: current.revision + 1 }))
+  }
+
+  return { data, isLoading, error, offset: request.offset, filter: request.filter, handleLoad, handleFilterChange, refresh }
 }

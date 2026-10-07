@@ -35,9 +35,12 @@ function toRequestError(status: number, payload: unknown): ApiRequestError {
   return new ApiRequestError(status, message, code)
 }
 
+function apiUrl(path: string): string {
+  return `${(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '')}${path}`
+}
+
 async function requestJson(path: string, init: RequestInit): Promise<unknown> {
-  const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '')
-  const response = await fetch(`${baseUrl}${path}`, {
+  const response = await fetch(apiUrl(path), {
     ...init,
   })
   let payload: unknown
@@ -63,6 +66,31 @@ export function postJson(path: string, body: unknown): Promise<unknown> {
 
 export function getJson(path: string): Promise<unknown> {
   return requestJson(path, { method: 'GET', headers: { Accept: 'application/json' } })
+}
+
+// SSE처럼 응답 본문을 계속 읽어야 하는 요청. 연결 실패는 JSON 오류 응답과 같은 방식으로 ApiRequestError로 바꾼다.
+export async function authenticatedStream(
+  path: string, accessToken: string, headers: Record<string, string>, signal?: AbortSignal,
+): Promise<ReadableStream<Uint8Array>> {
+  const response = await fetch(apiUrl(path), {
+    method: 'GET',
+    headers: { Accept: 'text/event-stream', Authorization: `Bearer ${accessToken}`, ...headers },
+    cache: 'no-store',
+    signal,
+  })
+  if (!response.ok) {
+    let payload: unknown
+    try {
+      payload = await response.json()
+    } catch {
+      payload = undefined
+    }
+    throw toRequestError(response.status, payload)
+  }
+  if (!response.headers.get('Content-Type')?.includes('text/event-stream') || !response.body) {
+    throw new ApiRequestError(response.status, '실시간 이벤트 응답 형식이 올바르지 않습니다. API 주소를 확인해 주세요.', 'INVALID_RESPONSE')
+  }
+  return response.body
 }
 
 export function authenticatedFetch(path: string, accessToken: string, signal?: AbortSignal): Promise<unknown> {

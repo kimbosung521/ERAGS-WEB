@@ -5,6 +5,7 @@ import EmergencyList from './components/EmergencyList'
 import EmergencyMap from './components/EmergencyMap'
 import { useEmergencyDetail } from './hooks/useEmergencyDetail'
 import { useEmergencyList } from './hooks/useEmergencyList'
+import { useMonitoringEvents, type EventConnectionStatus } from './hooks/useMonitoringEvents'
 import { ApiRequestError } from '../../services/api'
 import { MONITORING_PAGE_SIZE } from '../../services/monitoring'
 import type { Emergency } from '../../types/emergency'
@@ -16,8 +17,12 @@ interface Props {
 
 const emptyEmergencies: readonly Emergency[] = []
 
+const eventStatusLabels: Record<EventConnectionStatus, string> = {
+  connecting: '실시간 연결 중', open: '실시간 연결됨', reconnecting: '실시간 재연결 중', stopped: '실시간 연결 중단',
+}
+
 export default function EmergencyScreen({ onLogout }: Props) {
-  const { data, isLoading, error, offset, filter, handleLoad, handleFilterChange } = useEmergencyList()
+  const { data, isLoading, error, offset, filter, handleLoad, handleFilterChange, refresh } = useEmergencyList()
   const emergencies = data?.items ?? emptyEmergencies
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'list' | 'map'>('list')
@@ -25,11 +30,14 @@ export default function EmergencyScreen({ onLogout }: Props) {
   const selectedEmergency = emergencies.find((emergency) => emergency.id === selectedId) ?? emergencies[0] ?? null
   const activeId = selectedEmergency?.id ?? null
   const { detail, isLoading: isDetailLoading, error: detailError } = useEmergencyDetail(activeId)
+  // 새 가이드 생성 이벤트는 진행·위치·관제 상태가 없으므로 화면 값을 덮어쓰지 않고, 현재 조건으로 목록을 다시 조회한다.
+  // 필터는 목록 조회가 서버에서 적용하고, 선택한 사건은 바꾸지 않는다.
+  const { status: eventStatus, error: eventError } = useMonitoringEvents(data?.eventCursor ?? null, refresh)
 
   // 토큰 누락·만료(401)는 다시 로그인해야 하므로 로그인 화면으로 보낸다.
   useEffect(() => {
-    if ([error, detailError].some((reason) => reason instanceof ApiRequestError && reason.status === 401)) onLogout()
-  }, [error, detailError, onLogout])
+    if ([error, detailError, eventError].some((reason) => reason instanceof ApiRequestError && reason.status === 401)) onLogout()
+  }, [error, detailError, eventError, onLogout])
 
   function handleSelect(id: string) {
     setSelectedId(id)
@@ -56,7 +64,7 @@ export default function EmergencyScreen({ onLogout }: Props) {
               {data && (
                 <span className="emergency-sync-meta">
                   <span className={`emergency-live-dot${error ? ' paused' : ''}`} aria-hidden="true" />
-                  {error ? '갱신 실패' : '5초마다 자동 갱신'} · {new Date(data.fetchedAt).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul' })} 기준 (한국 시간)
+                  {error ? '갱신 실패' : '5초마다 자동 갱신'} · {eventStatusLabels[eventStatus]} · {new Date(data.fetchedAt).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul' })} 기준 (한국 시간)
                 </span>
               )}
               <button className="emergency-button" type="button" onClick={() => handleLoad()} disabled={isLoading}>
@@ -68,6 +76,7 @@ export default function EmergencyScreen({ onLogout }: Props) {
           <div className="emergency-notices">
             {isLoading && <p className="emergency-notice" role="status">사건 목록을 불러오는 중입니다.</p>}
             {error && <p className="emergency-notice danger" role="alert">{error.message}</p>}
+            {eventStatus === 'stopped' && eventError && <p className="emergency-notice warning" role="alert">실시간 연결이 중단되었습니다: {eventError.message} (5초 자동 갱신은 계속됩니다)</p>}
             {data && data.invalidCount > 0 && <p className="emergency-notice warning" role="alert">응답 형식 오류로 사건 {data.invalidCount}건을 표시하지 못했습니다. 관리자에게 문의해 주세요.</p>}
           </div>
         </div>
