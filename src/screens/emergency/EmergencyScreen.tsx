@@ -29,15 +29,18 @@ export default function EmergencyScreen({ onLogout }: Props) {
   const detailRef = useRef<HTMLDivElement>(null)
   const selectedEmergency = emergencies.find((emergency) => emergency.id === selectedId) ?? emergencies[0] ?? null
   const activeId = selectedEmergency?.id ?? null
-  const { detail, isLoading: isDetailLoading, error: detailError } = useEmergencyDetail(activeId)
+  // 관제 상태를 바꾸면 목록의 상태 표시와 상태 필터 결과도 바뀌므로 목록을 바로 다시 조회한다.
+  const {
+    detail, isLoading: isDetailLoading, error: detailError, changeStatus, isStatusChanging, statusChangeError,
+  } = useEmergencyDetail(activeId, refresh)
   // 새 가이드 생성 이벤트는 진행·위치·관제 상태가 없으므로 화면 값을 덮어쓰지 않고, 현재 조건으로 목록을 다시 조회한다.
   // 필터는 목록 조회가 서버에서 적용하고, 선택한 사건은 바꾸지 않는다.
   const { status: eventStatus, error: eventError } = useMonitoringEvents(data?.eventCursor ?? null, refresh)
 
   // 토큰 누락·만료(401)는 다시 로그인해야 하므로 로그인 화면으로 보낸다.
   useEffect(() => {
-    if ([error, detailError, eventError].some((reason) => reason instanceof ApiRequestError && reason.status === 401)) onLogout()
-  }, [error, detailError, eventError, onLogout])
+    if ([error, detailError, eventError, statusChangeError].some((reason) => reason instanceof ApiRequestError && reason.status === 401)) onLogout()
+  }, [error, detailError, eventError, statusChangeError, onLogout])
 
   function handleSelect(id: string) {
     setSelectedId(id)
@@ -104,7 +107,10 @@ export default function EmergencyScreen({ onLogout }: Props) {
             {selectedEmergency ? `${selectedEmergency.id} 상세 정보 보기 ↓` : '선택된 상황 없음'}
           </button>
           <div className="emergency-detail-slot" ref={detailRef} tabIndex={-1}>
-            <EmergencyDetail emergency={selectedEmergency} detail={detail} isLoading={isDetailLoading} error={detailError} />
+            <EmergencyDetail
+              emergency={selectedEmergency} detail={detail} isLoading={isDetailLoading} error={detailError}
+              isStatusChanging={isStatusChanging} statusChangeError={statusChangeError} onStatusChange={changeStatus}
+            />
           </div>
         </div>
         <p className="emergency-disclaimer">목록과 선택한 사건의 상세는 5초마다 자동 갱신됩니다. 이름·연락처는 관제 API에서 제공되지 않습니다.</p>

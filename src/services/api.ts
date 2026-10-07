@@ -21,6 +21,12 @@ const errorMessages: Record<string, string> = {
   HTTPS_REQUIRED: '보안 연결(HTTPS)로 접속해야 합니다.',
   INVALID_REQUEST: '요청 값이 올바르지 않습니다.',
   INCIDENT_NOT_FOUND: '해당 사건을 찾을 수 없습니다.',
+  REOPEN_REASON_REQUIRED: '종료된 사건을 다시 열려면 사유를 입력해야 합니다.',
+  REVISION_CONFLICT: '다른 담당자가 먼저 상태를 바꿨습니다. 최신 상태를 확인한 뒤 다시 시도해 주세요.',
+  STATUS_CONFLICT: '현재 상태에서는 그 상태로 바꿀 수 없습니다. 최신 상태를 확인해 주세요.',
+  STORE_BUSY: '서버가 다른 요청을 처리 중입니다. 잠시 후 다시 시도해 주세요.',
+  MONITORING_DISABLED: '관제 기능이 비활성화되어 있습니다.',
+  FILE_DATABASE_REQUIRED: '서버 관제 저장소가 설정되지 않았습니다. 관리자에게 문의해 주세요.',
 }
 
 function toRequestError(status: number, payload: unknown): ApiRequestError {
@@ -92,6 +98,14 @@ export async function authenticatedStream(
     throw new ApiRequestError(response.status, '실시간 이벤트 응답 형식이 올바르지 않습니다. API 주소를 확인해 주세요.', 'INVALID_RESPONSE')
   }
   return response.body
+}
+
+export function authenticatedPatchJson(path: string, accessToken: string, body: unknown): Promise<unknown> {
+  return requestJson(path, {
+    method: 'PATCH',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify(body),
+  })
 }
 
 export function authenticatedFetch(path: string, accessToken: string, signal?: AbortSignal): Promise<unknown> {

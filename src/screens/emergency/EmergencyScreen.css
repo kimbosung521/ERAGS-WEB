@@ -109,6 +109,11 @@
 .emergency-fields > div { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
 .emergency-fields dt { color: var(--muted); }
 .emergency-fields dd { margin: 0; overflow-wrap: anywhere; }
+.emergency-status-actions { display: grid; gap: 8px; margin-top: 16px; }
+.emergency-status-actions > .emergency-button { justify-self: start; }
+.emergency-reopen { display: grid; gap: 6px; font-size: 14px; }
+.emergency-reopen textarea { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font: inherit; resize: vertical; }
+.emergency-reopen .emergency-button { justify-self: start; }
 .emergency-detail-section { margin-top: 20px; }
 .emergency-detail-section h3 { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; font-size: 15px; }
 .emergency-detail-section h3 small { font-weight: 400; }

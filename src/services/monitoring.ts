@@ -1,4 +1,4 @@
-import { ApiRequestError, authenticatedFetch, getJson, isRecord } from './api'
+import { ApiRequestError, authenticatedFetch, authenticatedPatchJson, getJson, isRecord } from './api'
 import { withAdminToken } from './auth'
 import type {
   Emergency, EmergencyIncidentDetail, EmergencyListResult, EmergencyStatus, MonitoringIncidentFilter, MonitoringSupply,
@@ -239,6 +239,10 @@ export async function getMonitoringIncident(incidentId: string, signal?: AbortSi
     withAdminToken((accessToken) => authenticatedFetch(path, accessToken, signal)),
     loadCategoryLabelsWithin(CATEGORY_LABELS_TIMEOUT_MS),
   ])
+  return parseIncidentDetailResponse(payload, categoryLabels)
+}
+
+function parseIncidentDetailResponse(payload: unknown, categoryLabels: Record<string, string>): EmergencyIncidentDetail {
   if (!isRecord(payload) || payload.success !== true) return invalidResponse('사건 상세')
   try {
     return parseIncidentDetail(payload.data, categoryLabels)
@@ -246,4 +250,31 @@ export async function getMonitoringIncident(incidentId: string, signal?: AbortSi
     if (error instanceof InvalidDetail) return invalidResponse('사건 상세')
     throw error
   }
+}
+
+const statusCodes: Record<EmergencyStatus, string> = {
+  unconfirmed: 'NEW', acknowledged: 'ACKNOWLEDGED', responding: 'RESPONDING', closed: 'CLOSED',
+}
+
+/**
+ * 관제 담당자 처리 상태를 바꾸고 최신 사건 전체를 돌려준다. expectedRevision에는 상세의 최상위 revision을 보낸다.
+ * 다른 담당자가 먼저 바꿨으면 409(REVISION_CONFLICT)가 오므로 상세를 다시 조회해야 한다.
+ */
+export async function updateMonitoringIncidentStatus(
+  incidentId: string, command: { status: EmergencyStatus; expectedRevision: number; reason?: string },
+): Promise<EmergencyIncidentDetail> {
+  const path = `/api/v1/monitoring/incidents/${encodeURIComponent(incidentId)}/status`
+  const body = {
+    status: statusCodes[command.status], expectedRevision: command.expectedRevision,
+    ...(command.reason?.trim() ? { reason: command.reason.trim() } : {}),
+  }
+  console.info(`[monitoring] 관제 상태 변경 요청
+  incidentId=${incidentId}
+  PATCH ${path}
+  body=${JSON.stringify(body)}`)
+  const [payload, categoryLabels] = await Promise.all([
+    withAdminToken((accessToken) => authenticatedPatchJson(path, accessToken, body)),
+    loadCategoryLabelsWithin(CATEGORY_LABELS_TIMEOUT_MS),
+  ])
+  return parseIncidentDetailResponse(payload, categoryLabels)
 }

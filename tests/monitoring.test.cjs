@@ -325,3 +325,39 @@ test('세션이 없으면 상세도 네트워크 요청 전에 인증 오류를 
   await assert.rejects(service.getMonitoringIncident('x'), (error) => error.status === 401 && error.errorCode === 'AUTH_REQUIRED')
   assert.equal(service.requests.length, 0)
 })
+
+test('관제 상태 변경은 서버 상태 코드와 상세 revision을 PATCH로 보내고 최신 사건을 돌려준다', async () => {
+  const payload = detailResponse()
+  payload.data.status = 'CLOSED'
+  payload.data.revision = 3
+  const service = setup(payload)
+  const detail = await service.updateMonitoringIncidentStatus('test/compound', { status: 'closed', expectedRevision: 2 })
+  const request = service.requests[0]
+  assert.equal(request.url, 'https://api.example.com/api/v1/monitoring/incidents/test%2Fcompound/status')
+  assert.equal(request.init.method, 'PATCH')
+  assert.equal(request.init.headers.Authorization, 'Bearer test-access')
+  assert.equal(request.init.headers['Content-Type'], 'application/json')
+  assert.deepEqual(JSON.parse(request.init.body), { status: 'CLOSED', expectedRevision: 2 })
+  assert.equal(detail.status, 'closed')
+  assert.equal(detail.revision, 3)
+})
+
+test('재개 사유는 앞뒤 공백을 지워 보내고, 공백뿐이면 보내지 않는다', async () => {
+  const service = setup(detailResponse())
+  await service.updateMonitoringIncidentStatus('a', { status: 'acknowledged', expectedRevision: 3, reason: '  추가 확인 필요 ' })
+  await service.updateMonitoringIncidentStatus('a', { status: 'acknowledged', expectedRevision: 3, reason: '   ' })
+  assert.deepEqual(JSON.parse(service.requests[0].init.body), { status: 'ACKNOWLEDGED', expectedRevision: 3, reason: '추가 확인 필요' })
+  assert.deepEqual(JSON.parse(service.requests[1].init.body), { status: 'ACKNOWLEDGED', expectedRevision: 3 })
+})
+
+test('상태 변경 충돌(409)과 재개 사유 누락(400)은 안내 문구와 코드를 보존한다', async () => {
+  const failure = (code) => ({ success: false, error: { code, message: code, details: [] } })
+  await assert.rejects(
+    setup(failure('REVISION_CONFLICT'), { status: 409 }).updateMonitoringIncidentStatus('a', { status: 'responding', expectedRevision: 1 }),
+    (error) => error.status === 409 && error.errorCode === 'REVISION_CONFLICT' && error.message.includes('다른 담당자'),
+  )
+  await assert.rejects(
+    setup(failure('REOPEN_REASON_REQUIRED'), { status: 400 }).updateMonitoringIncidentStatus('a', { status: 'acknowledged', expectedRevision: 1 }),
+    (error) => error.status === 400 && error.errorCode === 'REOPEN_REASON_REQUIRED' && error.message.includes('사유'),
+  )
+})

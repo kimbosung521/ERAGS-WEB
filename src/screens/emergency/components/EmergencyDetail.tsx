@@ -1,4 +1,5 @@
-import type { Emergency, EmergencyIncidentDetail, MonitoringSupply } from '../../../types/emergency'
+import type { Emergency, EmergencyIncidentDetail, EmergencyStatus, MonitoringSupply } from '../../../types/emergency'
+import EmergencyStatusActions from './EmergencyStatusActions'
 import {
   ageGroupLabels, codeLabel, dispositionLabels, emergencyStatusLabels, generationStatusLabels, guideKindLabels,
   locationStatusLabels, progressStatusLabels,
@@ -9,6 +10,9 @@ interface Props {
   detail: EmergencyIncidentDetail | null
   isLoading: boolean
   error: Error | null
+  isStatusChanging: boolean
+  statusChangeError: Error | null
+  onStatusChange: (status: EmergencyStatus, reason?: string) => void
 }
 
 function formatKst(iso: string) {
@@ -118,7 +122,9 @@ function DetailSections({ detail }: { detail: EmergencyIncidentDetail }) {
   )
 }
 
-export default function EmergencyDetail({ emergency, detail, isLoading, error }: Props) {
+export default function EmergencyDetail({
+  emergency, detail, isLoading, error, isStatusChanging, statusChangeError, onStatusChange,
+}: Props) {
   // 상세가 목록보다 최신일 수 있으므로 관제 상태는 상세 값을 우선한다.
   const status = detail?.status ?? emergency?.status
   return (
@@ -137,6 +143,12 @@ export default function EmergencyDetail({ emergency, detail, isLoading, error }:
               {detail ? `상세 갱신 실패: ${error.message} (마지막으로 받은 정보를 표시합니다)` : error.message}
             </p>}
           </div>
+          {/* 상태 변경에는 상세의 revision이 필요하므로 상세를 받은 뒤에만 보여준다. 사건이 바뀌면 입력 중인 사유를 비운다. */}
+          {detail && (
+            <EmergencyStatusActions
+              key={detail.id} status={detail.status} isPending={isStatusChanging} error={statusChangeError} onChange={onStatusChange}
+            />
+          )}
           {detail && <DetailSections detail={detail} />}
           <p className="emergency-muted emergency-detail-note">이름·연락처는 관제 API에서 제공되지 않습니다. 시각은 한국 시간입니다.</p>
         </>
