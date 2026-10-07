@@ -4,7 +4,7 @@ import type { Emergency } from '../../../types/emergency'
 import { emergencyStatusLabels } from '../emergency.constants'
 
 function markerLabel(emergency: Emergency) {
-  return `${emergency.person?.name ?? emergency.id}, ${emergency.category}, ${emergencyStatusLabels[emergency.status]}`
+  return `${emergency.id}, ${emergency.category}, ${emergencyStatusLabels[emergency.status]}`
 }
 
 export function useEmergencyMap(

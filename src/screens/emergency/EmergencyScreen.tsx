@@ -101,7 +101,7 @@ export default function EmergencyScreen({ onLogout }: Props) {
             <EmergencyMap emergencies={emergencies} selectedId={activeId} onSelect={handleSelect} />
           </div>
           <button className="emergency-mobile-detail-link" onClick={handleShowDetail} disabled={!selectedEmergency}>
-            {selectedEmergency ? `${selectedEmergency.person?.name ?? selectedEmergency.id} 상세 정보 보기 ↓` : '선택된 상황 없음'}
+            {selectedEmergency ? `${selectedEmergency.id} 상세 정보 보기 ↓` : '선택된 상황 없음'}
           </button>
           <div className="emergency-detail-slot" ref={detailRef} tabIndex={-1}>
             <EmergencyDetail emergency={selectedEmergency} detail={detail} isLoading={isDetailLoading} error={detailError} />

@@ -52,7 +52,7 @@ export function monthCells(year: number, month: number): (number | null)[] {
   })
 }
 
-export function weekdayOf(date: string): string {
+function weekdayOf(date: string): string {
   const [year, month, day] = date.split('-').map(Number)
   return weekdays[new Date(Date.UTC(year, month - 1, day)).getUTCDay()]
 }

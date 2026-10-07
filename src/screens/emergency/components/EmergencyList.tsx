@@ -25,7 +25,7 @@ export default function EmergencyList({ emergencies, selectedId, onSelect, hasLo
                 {emergencyStatusLabels[emergency.status]}
               </span>
               <strong>{emergency.category}</strong>
-              <span>{emergency.person ? `${emergency.person.name} · ${emergency.person.age}세` : emergency.id}</span>
+              <span>{emergency.id}</span>
               <span className="emergency-muted">{emergency.address}</span>
               <time dateTime={emergency.occurredAt}>{new Date(emergency.occurredAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} 접수</time>
             </button>

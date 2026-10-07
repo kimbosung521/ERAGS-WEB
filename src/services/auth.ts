@@ -31,10 +31,6 @@ export function hasStoredAdminSession(): boolean {
   return readAdminSession() !== null
 }
 
-export function getAdminAccessToken(): string | null {
-  return getAdminSessionExpiresAt() === null ? null : readAdminSession()?.access_token ?? null
-}
-
 export function getAdminSessionExpiresAt(): number | null {
   const session = readAdminSession()
   return session && session.expires_at > Date.now() ? session.expires_at : null

@@ -9,7 +9,7 @@ const statuses: Record<string, EmergencyStatus> = {
 }
 
 export const MONITORING_PAGE_SIZE = 50
-export const DEFAULT_MONITORING_FILTER: MonitoringIncidentFilter = { status: 'ACTIVE', from: null, to: null }
+const DEFAULT_MONITORING_FILTER: MonitoringIncidentFilter = { status: 'ACTIVE', from: null, to: null }
 const CATEGORY_LABELS_TIMEOUT_MS = 2_000
 
 let categoryLabelsRequest: Promise<Record<string, string>> | null = null
@@ -79,11 +79,11 @@ function parseIncident(value: unknown, categoryLabels: Record<string, string>): 
   }
   const location = parseLocation(value.location)
   if (location === undefined) return null
-  // 관제 DTO가 제공하지 않는 개인정보와 주소는 가상 데이터로 보충하지 않는다.
+  // 관제 DTO는 이름·연락처를 제공하지 않으므로 사건 ID와 좌표로만 표시한다.
   return {
     id: value.incidentId, status: statuses[value.status],
     category: categories.join(' · ') || '손상 정보 없음', occurredAt: value.guide.createdAt,
-    person: null, guardian: null, location,
+    location,
     address: location ? `${location.latitude}, ${location.longitude}` : '위치 미확인',
   }
 }

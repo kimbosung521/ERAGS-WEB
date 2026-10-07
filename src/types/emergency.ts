@@ -5,9 +5,7 @@ export interface Emergency {
   category: string
   status: EmergencyStatus
   occurredAt: string
-  person: { name: string; age: number } | null
   address: string
-  guardian: { name: string; phone: string } | null
   location: { latitude: number; longitude: number } | null
 }
 
