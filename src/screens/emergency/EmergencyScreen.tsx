@@ -1,8 +1,11 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import EmergencyDetail from './components/EmergencyDetail'
+import EmergencyFilter from './components/EmergencyFilter'
 import EmergencyList from './components/EmergencyList'
 import EmergencyMap from './components/EmergencyMap'
 import { useEmergencyList } from './hooks/useEmergencyList'
+import { ApiRequestError } from '../../services/api'
+import { MONITORING_PAGE_SIZE } from '../../services/monitoring'
 import type { Emergency } from '../../types/emergency'
 import './EmergencyScreen.css'
 
@@ -13,13 +16,18 @@ interface Props {
 const emptyEmergencies: readonly Emergency[] = []
 
 export default function EmergencyScreen({ onLogout }: Props) {
-  const { data, isLoading, error, offset, handleLoad } = useEmergencyList()
+  const { data, isLoading, error, offset, filter, handleLoad, handleFilterChange } = useEmergencyList()
   const emergencies = data?.items ?? emptyEmergencies
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'list' | 'map'>('list')
   const detailRef = useRef<HTMLDivElement>(null)
   const selectedEmergency = emergencies.find((emergency) => emergency.id === selectedId) ?? emergencies[0] ?? null
   const activeId = selectedEmergency?.id ?? null
+
+  // 토큰 누락·만료(401)는 다시 로그인해야 하므로 로그인 화면으로 보낸다.
+  useEffect(() => {
+    if (error instanceof ApiRequestError && error.status === 401) onLogout()
+  }, [error, onLogout])
 
   function handleSelect(id: string) {
     setSelectedId(id)
@@ -37,12 +45,29 @@ export default function EmergencyScreen({ onLogout }: Props) {
       </header>
       <main className="emergency-content">
         <div className="emergency-intro">
-          <h1>위급상황 모니터링</h1>
-          <p className="emergency-muted">목록 또는 지도에서 상황을 선택해 상세 정보를 확인하세요.</p>
-          <button type="button" onClick={() => handleLoad()} disabled={isLoading}>목록 새로고침</button>
-          {isLoading && <p role="status">사건 목록을 불러오는 중입니다.</p>}
-          {error && <p role="alert">{error.message}</p>}
-          {data && <p className="emergency-muted">활성 사건 총 {data.total}건 · 조회 시각 {new Date(data.fetchedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} (한국 시간)</p>}
+          <div className="emergency-intro-head">
+            <div>
+              <h1>위급상황 모니터링</h1>
+              <p className="emergency-muted">목록 또는 지도에서 상황을 선택해 상세 정보를 확인하세요.</p>
+            </div>
+            <div className="emergency-sync">
+              {data && (
+                <span className="emergency-sync-meta">
+                  <span className={`emergency-live-dot${error ? ' paused' : ''}`} aria-hidden="true" />
+                  {error ? '갱신 실패' : '5초마다 자동 갱신'} · {new Date(data.fetchedAt).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul' })} 기준 (한국 시간)
+                </span>
+              )}
+              <button className="emergency-button" type="button" onClick={() => handleLoad()} disabled={isLoading}>
+                {isLoading ? '불러오는 중…' : '새로고침'}
+              </button>
+            </div>
+          </div>
+          <EmergencyFilter filter={filter} disabled={isLoading} onApply={handleFilterChange} />
+          <div className="emergency-notices">
+            {isLoading && <p className="emergency-notice" role="status">사건 목록을 불러오는 중입니다.</p>}
+            {error && <p className="emergency-notice danger" role="alert">{error.message}</p>}
+            {data && data.invalidCount > 0 && <p className="emergency-notice warning" role="alert">응답 형식 오류로 사건 {data.invalidCount}건을 표시하지 못했습니다. 관리자에게 문의해 주세요.</p>}
+          </div>
         </div>
         <div className="emergency-mobile-controls" role="group" aria-label="보기 선택">
           <button aria-pressed={activeTab === 'list'} onClick={() => setActiveTab('list')}>목록</button>
@@ -51,12 +76,15 @@ export default function EmergencyScreen({ onLogout }: Props) {
         <div className="emergency-layout" data-active-tab={activeTab}>
           <div className="emergency-list-slot">
             <EmergencyList emergencies={emergencies} selectedId={activeId} onSelect={handleSelect} hasLoaded={data !== null} />
-            <div role="group" aria-label="목록 페이지 이동">
-              <button type="button" disabled={isLoading || offset === 0} onClick={() => handleLoad(Math.max(0, offset - 50))}>이전</button>
-              <button type="button" disabled={isLoading || data?.nextOffset == null} onClick={() => {
+            <nav className="emergency-pagination" aria-label="목록 페이지 이동">
+              <button className="emergency-button" type="button" disabled={isLoading || offset === 0} onClick={() => handleLoad(Math.max(0, offset - MONITORING_PAGE_SIZE))}>‹ 이전</button>
+              <span className="emergency-muted">
+                {data && data.total > 0 ? `${offset + 1}–${Math.min(offset + MONITORING_PAGE_SIZE, data.total)} / 총 ${data.total}건` : '–'}
+              </span>
+              <button className="emergency-button" type="button" disabled={isLoading || data?.nextOffset == null} onClick={() => {
                 if (data?.nextOffset != null) handleLoad(data.nextOffset)
-              }}>다음</button>
-            </div>
+              }}>다음 ›</button>
+            </nav>
           </div>
           <div className="emergency-map-slot">
             <EmergencyMap emergencies={emergencies} selectedId={activeId} onSelect={handleSelect} />
@@ -68,7 +96,7 @@ export default function EmergencyScreen({ onLogout }: Props) {
             <EmergencyDetail emergency={selectedEmergency} />
           </div>
         </div>
-        <p className="emergency-disclaimer">목록 응답 기준 정보입니다. 이름·연락처는 관제 API에서 제공되지 않습니다. 상세 API와 실시간 갱신은 아직 연결되지 않았습니다.</p>
+        <p className="emergency-disclaimer">목록 응답 기준 정보입니다. 이름·연락처는 관제 API에서 제공되지 않습니다. 목록은 5초마다 자동 갱신되며, 상세 API는 아직 연결되지 않았습니다.</p>
       </main>
     </div>
   )

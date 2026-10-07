@@ -4,16 +4,26 @@ const { readFileSync } = require('node:fs')
 const vm = require('node:vm')
 const ts = require('typescript')
 
-function setup(payload, { status = 200, hasSession = true, hasInvalidJson = false } = {}) {
+const CATEGORIES_URL = 'https://api.example.com/api/v2/first-aid/categories'
+
+function setup(payload, {
+  status = 200, hasSession = true, hasInvalidJson = false, categories = { success: true, data: [] }, categoryStatus = 200,
+} = {}) {
   const requests = []
+  const categoryRequests = []
   function load(path, imports = {}) {
     const source = readFileSync(path, 'utf8').replace('import.meta.env.VITE_API_BASE_URL', '"https://api.example.com/"')
     const code = ts.transpileModule(source, {
       compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
     }).outputText
     const context = {
-      exports: {}, require: (name) => imports[name], URLSearchParams,
+      exports: {}, require: (name) => imports[name], URLSearchParams, console: { warn: () => {}, info: () => {} }, setTimeout, clearTimeout,
       fetch: async (url, init) => {
+        if (url === CATEGORIES_URL) {
+          categoryRequests.push({ url, init })
+          if (categories === 'hang') return new Promise(() => {})
+          return { status: categoryStatus, ok: categoryStatus >= 200 && categoryStatus < 300, json: async () => categories }
+        }
         requests.push({ url, init })
         return {
           status, ok: status >= 200 && status < 300,
@@ -31,7 +41,7 @@ function setup(payload, { status = 200, hasSession = true, hasInvalidJson = fals
   const monitoring = load('src/services/monitoring.ts', {
     './api': api, './auth': { getAdminAccessToken: () => hasSession ? 'test-access' : null },
   })
-  return { ...monitoring, requests }
+  return { ...monitoring, requests, categoryRequests }
 }
 
 function response() {
@@ -50,7 +60,7 @@ function response() {
 test('Bearer 인증으로 활성 목록을 요청하고 커서와 페이지 정보를 유지한다', async () => {
   const service = setup(response())
   const signal = new AbortController().signal
-  const result = await service.getMonitoringIncidents(0, signal)
+  const result = await service.getMonitoringIncidents(undefined, 0, signal)
   const request = service.requests[0]
   assert.equal(request.url, 'https://api.example.com/api/v1/monitoring/incidents?status=ACTIVE&limit=50&offset=0')
   assert.equal(request.init.method, 'GET')
@@ -90,7 +100,7 @@ test('빈 목록은 정상 결과이며 다음 페이지 요청은 지정된 off
   payload.data.items = []
   payload.data.nextOffset = null
   const service = setup(payload)
-  const result = await service.getMonitoringIncidents(50)
+  const result = await service.getMonitoringIncidents(undefined, 50)
   assert.equal(result.items.length, 0)
   assert.equal(result.nextOffset, null)
   assert.ok(service.requests[0].url.endsWith('offset=50'))
@@ -119,14 +129,12 @@ test('성공 HTTP 상태의 실패 응답도 서버 오류를 유지한다', asy
   await assert.rejects(service.getMonitoringIncidents(), (error) => error.status === 200 && error.errorCode === 'DENIED' && error.message === '조회 거부')
 })
 
-test('잘못된 응답과 좌표는 가짜 빈 목록으로 처리하지 않는다', async () => {
+test('잘못된 응답 구조는 가짜 빈 목록으로 처리하지 않는다', async () => {
   const invalidPayloads = [null, { success: true, data: {} }]
   for (const mutate of [
     (data) => { data.eventCursor = -1 },
     (data) => { data.nextOffset = 0 },
-    (data) => { data.items[0].status = 'toString' },
-    (data) => { data.items[0].guide.createdAt = 'invalid-date' },
-    (data) => { data.items[0].location = { latitude: 200, longitude: 127 } },
+    (data) => { data.items = {} },
   ]) {
     const payload = response()
     mutate(payload.data)
@@ -136,4 +144,85 @@ test('잘못된 응답과 좌표는 가짜 빈 목록으로 처리하지 않는�
     await assert.rejects(setup(payload).getMonitoringIncidents(), (error) => error.errorCode === 'INVALID_RESPONSE')
   }
   await assert.rejects(setup(null, { hasInvalidJson: true }).getMonitoringIncidents(), (error) => error.errorCode === 'INVALID_RESPONSE')
+})
+
+test('형식이 잘못된 사건만 제외하고 나머지 사건은 유지한다', async () => {
+  for (const mutate of [
+    (item) => { item.status = 'toString' },
+    (item) => { item.incidentId = ' ' },
+    (item) => { item.guide.createdAt = 'invalid-date' },
+    (item) => { item.guide.injuries = [{ categoryCode: 1 }] },
+    (item) => { item.location = { latitude: 200, longitude: 127 } },
+    (item) => { item.location = { latitude: 37.5, longitude: null } },
+  ]) {
+    const payload = response()
+    const broken = structuredClone(payload.data.items[0])
+    broken.incidentId = 'test-broken'
+    mutate(broken)
+    payload.data.items.push(broken, null)
+    const result = await setup(payload).getMonitoringIncidents()
+    assert.equal(result.items.map((item) => item.id).join(), 'test-compound')
+    assert.equal(result.invalidCount, 2)
+  }
+})
+
+test('문서상 필수인 location 필드가 없으면 해당 사건을 제외한다', async () => {
+  assert.equal((await setup(response()).getMonitoringIncidents()).invalidCount, 0)
+  const payload = response()
+  delete payload.data.items[0].location
+  const result = await setup(payload).getMonitoringIncidents()
+  assert.equal(result.items.length, 0)
+  assert.equal(result.invalidCount, 1)
+})
+
+test('위치 보고 실패 객체(좌표 null)는 위치 미확인으로 표시한다', async () => {
+  const payload = response()
+  payload.data.items[0].location = {
+    status: 'DENIED', observedAt: '2026-10-03T08:00:00Z', receivedAt: '2026-10-03T08:00:01Z',
+    latitude: null, longitude: null, accuracy: null,
+  }
+  const incident = (await setup(payload).getMonitoringIncidents()).items[0]
+  assert.equal(incident.location, null)
+  assert.equal(incident.address, '위치 미확인')
+})
+
+test('문서 형식의 오류 envelope에서 code를 보존하고 코드만 있는 message는 안내 문구로 바꾼다', async () => {
+  const failure = (code, message) => ({ success: false, error: { code, message, details: [] } })
+  await assert.rejects(setup(failure('UNAUTHENTICATED', 'UNAUTHENTICATED'), { status: 401 }).getMonitoringIncidents(), (error) => {
+    assert.equal(error.status, 401)
+    assert.equal(error.errorCode, 'UNAUTHENTICATED')
+    assert.equal(error.message, '로그인이 만료되었습니다. 다시 로그인해 주세요.')
+    return true
+  })
+  await assert.rejects(setup(failure('HTTPS_REQUIRED', 'HTTPS_REQUIRED'), { status: 403 }).getMonitoringIncidents(), (error) => error.errorCode === 'HTTPS_REQUIRED' && error.message === '보안 연결(HTTPS)로 접속해야 합니다.')
+  await assert.rejects(setup(failure('INTERNAL_ERROR', '요청을 처리할 수 없습니다.'), { status: 500 }).getMonitoringIncidents(), (error) => error.errorCode === 'INTERNAL_ERROR' && error.message === '요청을 처리할 수 없습니다.')
+})
+
+test('카테고리 코드를 응급처치 대분류 이름으로 표시한다', async () => {
+  const service = setup(response(), { categories: { success: true, data: [{ category_code: 'BLEEDING', category_name: '출혈' }] } })
+  const result = await service.getMonitoringIncidents()
+  assert.equal(result.items[0].category, '출혈 · BURN')
+  assert.equal(service.categoryRequests[0].init.headers.Authorization, undefined)
+})
+
+test('카테고리 조회가 실패하거나 지연돼도 목록은 코드로 표시한다', async () => {
+  const failed = await setup(response(), { categoryStatus: 500, categories: { success: false, error: { code: 'INTERNAL_ERROR', message: 'x', details: [] } } }).getMonitoringIncidents()
+  assert.equal(failed.items[0].category, 'BLEEDING · BURN')
+  const startedAt = Date.now()
+  const slow = await setup(response(), { categories: 'hang' }).getMonitoringIncidents()
+  assert.equal(slow.items[0].category, 'BLEEDING · BURN')
+  assert.ok(Date.now() - startedAt < 3_000)
+})
+
+test('선택한 상태와 기간을 쿼리로 보내고 비어 있는 기간은 보내지 않는다', async () => {
+  const payload = response()
+  payload.data.nextOffset = null
+  const service = setup(payload)
+  await service.getMonitoringIncidents({ status: 'CLOSED', from: '2026-10-03T00:00:00+09:00', to: '2026-10-03T23:59:59+09:00' }, 0)
+  await service.getMonitoringIncidents({ status: 'ALL', from: null, to: null }, 50)
+  const first = new URL(service.requests[0].url).searchParams
+  assert.equal(first.get('status'), 'CLOSED')
+  assert.equal(first.get('from'), '2026-10-03T00:00:00+09:00')
+  assert.equal(first.get('to'), '2026-10-03T23:59:59+09:00')
+  assert.equal(service.requests[1].url, 'https://api.example.com/api/v1/monitoring/incidents?status=ALL&limit=50&offset=50')
 })
