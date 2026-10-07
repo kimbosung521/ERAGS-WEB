@@ -30,9 +30,13 @@ export default function EmergencyStatusActions({ status, isPending, error, onCha
   }
 
   return (
-    <div className="emergency-status-actions">
+    // 다음 단계 버튼만 있을 때는 요약 오른쪽에 붙이고, 재개 입력칸이나 오류가 있으면 요약 아래 전체 폭을 쓴다.
+    <div className={`emergency-status-actions${!next || error ? ' wide' : ''}`}>
       {next ? (
-        <button className="emergency-button primary" type="button" disabled={isPending} onClick={() => onChange(next.status)}>
+        <button
+          className="emergency-button primary" type="button" disabled={isPending} onClick={() => onChange(next.status)}
+          title="관제 처리 상태만 바뀌며 실제 처치 완료·물품 차감은 발생하지 않습니다."
+        >
           {isPending ? '변경 중…' : next.label}
         </button>
       ) : (
@@ -48,7 +52,6 @@ export default function EmergencyStatusActions({ status, isPending, error, onCha
         </form>
       )}
       {error && <p className="emergency-notice danger" role="alert">{error.message}</p>}
-      <p className="emergency-muted">관제 처리 상태만 바뀌며 실제 처치 완료·물품 차감은 발생하지 않습니다.</p>
     </div>
   )
 }
