@@ -1,5 +1,5 @@
 import type { EmergencyIncidentDetail, MonitoringSupply } from '../../../../types/emergency'
-import { codeLabel, locationStatusLabels, progressStatusLabels } from '../../emergency.constants'
+import { codeLabel, progressStatusLabels } from '../../emergency.constants'
 
 export function formatKst(iso: string) {
   return new Date(iso).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
@@ -10,10 +10,10 @@ export function formatSupply(supply: MonitoringSupply) {
   return `${name} ${supply.quantity === null ? '(수량 미확인)' : `${supply.quantity}개`}`
 }
 
-export function formatLocation(location: EmergencyIncidentDetail['location']) {
-  if (!location) return '위치 보고 전'
-  if (location.latitude === null || location.longitude === null) return codeLabel(locationStatusLabels, location.status)
-  return `${location.latitude}, ${location.longitude}${location.accuracy !== null ? ` (오차 ${location.accuracy}m)` : ''}`
+/** 좌표는 소수 5자리(약 1m)로, 오차는 미터 단위 정수로 줄여 읽기 쉽게 한다. */
+export function formatCoordinates(latitude: number, longitude: number, accuracy: number | null) {
+  const coordinates = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
+  return accuracy === null ? coordinates : `${coordinates} (오차 약 ${Math.round(accuracy)}m)`
 }
 
 // 진행 기록이 없으면(source=UNKNOWN) 실행 여부를 추정하지 않는다.

@@ -1,7 +1,15 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
-import { loadKakaoMaps, type KakaoMap } from '../../../services/kakaoMaps'
+import { loadKakaoMaps, type KakaoMap, type MapShape } from '../../../services/kakaoMaps'
 import type { Emergency } from '../../../types/emergency'
 import { emergencyStatusLabels } from '../emergency.constants'
+
+/** 선택한 사건의 상세 위치. 목록 좌표보다 최신이며 오차 반경과 주소를 함께 표시한다. */
+export interface SelectedLocation {
+  latitude: number
+  longitude: number
+  accuracy: number | null
+  label: string
+}
 
 function markerLabel(emergency: Emergency) {
   return `${emergency.id}, ${emergency.category}, ${emergencyStatusLabels[emergency.status]}`
@@ -9,6 +17,7 @@ function markerLabel(emergency: Emergency) {
 
 export function useEmergencyMap(
   emergencies: readonly Emergency[], selectedId: string | null, onSelect: (id: string) => void,
+  selectedLocation: SelectedLocation | null = null,
 ) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<KakaoMap | null>(null)
@@ -16,10 +25,22 @@ export function useEmergencyMap(
   const [isReady, setIsReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const handleSelect = useEffectEvent((id: string) => onSelect(id))
-  const getEmergencies = useEffectEvent(() => emergencies)
+  // 선택한 사건은 상세의 최신 좌표로 핀을 찍는다. 목록에 좌표가 없어도 상세에 있으면 지도에 보인다.
+  const emergenciesWithSelected = selectedLocation
+    ? emergencies.map((emergency) => emergency.id === selectedId
+      ? { ...emergency, location: { latitude: selectedLocation.latitude, longitude: selectedLocation.longitude } }
+      : emergency)
+    : emergencies
+  const getEmergencies = useEffectEvent(() => emergenciesWithSelected)
+  const getSelectedLocation = useEffectEvent(() => selectedLocation)
+  const selectedLocationKey = selectedLocation
+    ? [selectedLocation.latitude, selectedLocation.longitude, selectedLocation.accuracy, selectedLocation.label].join('|')
+    : null
+  // 좌표 값만 추려서, 주소가 늦게 도착하거나 오차만 바뀔 때는 지도를 옮기지 않는다.
+  const selectedPositionKey = selectedLocation ? `${selectedLocation.latitude},${selectedLocation.longitude}` : null
   const getSelectedId = useEffectEvent(() => selectedId)
   // 5초 자동 갱신마다 목록 배열은 새로 만들어지므로, 마커에 보이는 값이 바뀔 때만 마커를 다시 그린다.
-  const markerKey = emergencies.map((emergency, index) => emergency.location
+  const markerKey = emergenciesWithSelected.map((emergency, index) => emergency.location
     ? [emergency.id, index, emergency.status, markerLabel(emergency), emergency.location.latitude, emergency.location.longitude].join('|')
     : '').join('\n')
 
@@ -87,7 +108,28 @@ export function useEmergencyMap(
     }
   }, [isReady, markerKey])
 
-  // 선택이 바뀔 때만 지도를 옮긴다. 자동 갱신 때마다 옮기면 사용자가 둘러보던 위치에서 튕겨 나간다.
+  // 선택한 사건의 상세 위치에 오차 반경과 주소 라벨을 그린다. 값이 바뀔 때만 다시 그린다.
+  useEffect(() => {
+    const map = mapRef.current
+    const maps = window.kakao?.maps
+    const location = getSelectedLocation()
+    if (!isReady || !map || !maps || !location) return
+    const position = new maps.LatLng(location.latitude, location.longitude)
+    const shapes: MapShape[] = []
+    if (location.accuracy !== null && location.accuracy > 0) {
+      shapes.push(new maps.Circle({
+        map, center: position, radius: location.accuracy,
+        strokeWeight: 2, strokeColor: '#1d4ed8', strokeOpacity: 0.6, fillColor: '#3b82f6', fillOpacity: 0.15,
+      }))
+    }
+    const label = document.createElement('div')
+    label.className = 'emergency-map-label'
+    label.textContent = location.label
+    shapes.push(new maps.CustomOverlay({ map, position, content: label, yAnchor: 0, zIndex: 2 }))
+    return () => shapes.forEach((shape) => shape.setMap(null))
+  }, [isReady, selectedLocationKey])
+
+  // 선택이 바뀌거나 선택한 사건의 좌표가 바뀔 때만 지도를 옮긴다. 자동 갱신 때마다 옮기면 사용자가 둘러보던 위치에서 튕겨 나간다.
   useEffect(() => {
     const map = mapRef.current
     const maps = window.kakao?.maps
@@ -99,6 +141,6 @@ export function useEmergencyMap(
     })
     const selected = getEmergencies().find((emergency) => emergency.id === selectedId)
     if (selected?.location) map.setCenter(new maps.LatLng(selected.location.latitude, selected.location.longitude))
-  }, [selectedId, isReady])
+  }, [selectedId, selectedPositionKey, isReady])
   return { containerRef, isReady, error }
 }

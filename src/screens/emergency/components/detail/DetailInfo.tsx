@@ -1,6 +1,7 @@
 import type { EmergencyIncidentDetail } from '../../../../types/emergency'
 import { ageGroupLabels, codeLabel, generationStatusLabels, guideKindLabels } from '../../emergency.constants'
-import { formatKst, formatLocation } from './format'
+import { formatKst } from './format'
+import LocationText from './LocationText'
 
 export default function DetailInfo({ detail }: { detail: EmergencyIncidentDetail }) {
   const { guide, location } = detail
@@ -13,7 +14,7 @@ export default function DetailInfo({ detail }: { detail: EmergencyIncidentDetail
         <span className="emergency-muted"> · 저장 <time dateTime={guide.generatedAt}>{formatKst(guide.generatedAt)}</time></span>
       </dd></div>
       <div><dt>발생 위치</dt><dd>
-        {formatLocation(location)}
+        <LocationText location={location} />
         {location && <span className="emergency-muted"> · 수집 <time dateTime={location.observedAt}>{formatKst(location.observedAt)}</time></span>}
       </dd></div>
       {guide.blockedReasons.length > 0 && <div><dt>차단 사유</dt><dd>{guide.blockedReasons.join(', ')}</dd></div>}

@@ -51,7 +51,8 @@ src/
 ## 확장 기준
 
 여러 화면에서 재사용하는 UI가 생기면 `src/components/`로 옮깁니다.
-지도 수명주기와 선택 동기화는 `screens/emergency/hooks/useEmergencyMap.ts`, SDK 로딩은 `services/kakaoMaps.ts`에서 관리합니다.
+지도 수명주기와 선택 동기화는 `screens/emergency/hooks/useEmergencyMap.ts`, SDK 로딩과 좌표→주소 변환(역지오코딩, services 라이브러리)은 `services/kakaoMaps.ts`에서 관리합니다.
+상세 패널의 발생 위치는 `hooks/useLocationAddress.ts`로 주소를 구해 주소를 먼저, 좌표·오차를 보조로 표시합니다. 주소를 못 구하면 좌표만 표시합니다.
 서버 연동은 Screen → Hook → Domain Service → 공통 요청 계층 순서로 구성합니다.
 현재는 API 요청 계층이나 authenticatedFetch가 없으므로 미리 구현하지 않습니다.
 

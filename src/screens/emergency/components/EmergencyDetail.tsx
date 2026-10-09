@@ -1,7 +1,8 @@
 import type { Emergency, EmergencyIncidentDetail, EmergencyStatus } from '../../../types/emergency'
 import { emergencyStatusLabels } from '../emergency.constants'
 import DetailTabs from './detail/DetailTabs'
-import { formatLocation, formatProgress } from './detail/format'
+import { formatProgress } from './detail/format'
+import LocationText from './detail/LocationText'
 import EmergencyStatusActions from './EmergencyStatusActions'
 
 interface Props {
@@ -50,7 +51,7 @@ export default function EmergencyDetail({
           {detail && (
             <>
               <dl className="emergency-fields compact">
-                <div><dt>위치</dt><dd>{formatLocation(detail.location)}</dd></div>
+                <div><dt>위치</dt><dd><LocationText location={detail.location} /></dd></div>
                 <div><dt>처치</dt><dd>{formatProgress(detail)}</dd></div>
                 {detail.guide.redFlags.length > 0 && <div><dt>위험 신호</dt><dd className="emergency-danger-text">{detail.guide.redFlags.join(', ')}</dd></div>}
               </dl>

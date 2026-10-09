@@ -101,7 +101,7 @@ export default function EmergencyScreen({ onLogout }: Props) {
             </nav>
           </div>
           <div className="emergency-map-slot">
-            <EmergencyMap emergencies={emergencies} selectedId={activeId} onSelect={handleSelect} />
+            <EmergencyMap emergencies={emergencies} selectedId={activeId} onSelect={handleSelect} detailLocation={detail?.location ?? null} />
           </div>
           <button className="emergency-mobile-detail-link" onClick={handleShowDetail} disabled={!selectedEmergency}>
             {selectedEmergency ? `${selectedEmergency.id} 상세 정보 보기 ↓` : '선택된 상황 없음'}
