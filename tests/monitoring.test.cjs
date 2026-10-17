@@ -56,7 +56,7 @@ function response() {
         incidentId: 'test-compound', status: 'ACKNOWLEDGED', location: null,
         guide: { createdAt: '2026-10-03T08:00:00Z', injuries: [{ categoryCode: 'BLEEDING' }, { categoryCode: 'BURN' }] },
       }],
-      total: 51, nextOffset: 50, fetchedAt: '2026-10-03T08:00:00Z', eventCursor: 7,
+      total: 11, nextOffset: 5, fetchedAt: '2026-10-03T08:00:00Z', eventCursor: 7,
     },
   }
 }
@@ -66,12 +66,12 @@ test('Bearer 인증으로 활성 목록을 요청하고 커서와 페이지 정�
   const signal = new AbortController().signal
   const result = await service.getMonitoringIncidents(undefined, 0, signal)
   const request = service.requests[0]
-  assert.equal(request.url, 'https://api.example.com/api/v1/monitoring/incidents?status=ACTIVE&limit=50&offset=0')
+  assert.equal(request.url, 'https://api.example.com/api/v1/monitoring/incidents?status=ACTIVE&limit=5&offset=0')
   assert.equal(request.init.method, 'GET')
   assert.equal(request.init.headers.Authorization, 'Bearer test-access')
   assert.equal(request.init.signal, signal)
-  assert.equal(result.total, 51)
-  assert.equal(result.nextOffset, 50)
+  assert.equal(result.total, 11)
+  assert.equal(result.nextOffset, 5)
   assert.equal(result.eventCursor, 7)
   assert.equal(result.fetchedAt, response().data.fetchedAt)
 })
@@ -104,10 +104,10 @@ test('빈 목록은 정상 결과이며 다음 페이지 요청은 지정된 off
   payload.data.items = []
   payload.data.nextOffset = null
   const service = setup(payload)
-  const result = await service.getMonitoringIncidents(undefined, 50)
+  const result = await service.getMonitoringIncidents(undefined, 5)
   assert.equal(result.items.length, 0)
   assert.equal(result.nextOffset, null)
-  assert.ok(service.requests[0].url.endsWith('offset=50'))
+  assert.ok(service.requests[0].url.endsWith('offset=5'))
 })
 
 test('세션이 없으면 네트워크 요청 전에 인증 오류를 반환한다', async () => {
@@ -223,12 +223,12 @@ test('선택한 상태와 기간을 쿼리로 보내고 비어 있는 기간은 
   payload.data.nextOffset = null
   const service = setup(payload)
   await service.getMonitoringIncidents({ status: 'CLOSED', from: '2026-10-03T00:00:00+09:00', to: '2026-10-03T23:59:59+09:00' }, 0)
-  await service.getMonitoringIncidents({ status: 'ALL', from: null, to: null }, 50)
+  await service.getMonitoringIncidents({ status: 'ALL', from: null, to: null }, 5)
   const first = new URL(service.requests[0].url).searchParams
   assert.equal(first.get('status'), 'CLOSED')
   assert.equal(first.get('from'), '2026-10-03T00:00:00+09:00')
   assert.equal(first.get('to'), '2026-10-03T23:59:59+09:00')
-  assert.equal(service.requests[1].url, 'https://api.example.com/api/v1/monitoring/incidents?status=ALL&limit=50&offset=50')
+  assert.equal(service.requests[1].url, 'https://api.example.com/api/v1/monitoring/incidents?status=ALL&limit=5&offset=5')
 })
 
 function detailResponse() {

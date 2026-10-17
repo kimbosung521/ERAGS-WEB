@@ -8,7 +8,7 @@ const statuses: Record<string, EmergencyStatus> = {
   NEW: 'unconfirmed', ACKNOWLEDGED: 'acknowledged', RESPONDING: 'responding', CLOSED: 'closed',
 }
 
-export const MONITORING_PAGE_SIZE = 50
+export const MONITORING_PAGE_SIZE = 5
 const DEFAULT_MONITORING_FILTER: MonitoringIncidentFilter = { status: 'ACTIVE', from: null, to: null }
 const CATEGORY_LABELS_TIMEOUT_MS = 2_000
 

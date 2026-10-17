@@ -81,14 +81,14 @@
 .emergency-muted, .emergency-item time { color: var(--muted); font-size: 13px; }
 .emergency-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr) 340px; gap: 16px; align-items: stretch; }
 .emergency-layout > div { min-width: 0; }
-.emergency-list-slot { display: flex; flex-direction: column; gap: 12px; }
+.emergency-list-slot { display: flex; flex-direction: column; gap: 12px; align-self: start; }
 .emergency-list-slot .emergency-panel { flex: 1; height: auto; }
 .emergency-pagination { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px; border: 1px solid var(--border); border-radius: 12px; background: white; }
 .emergency-pagination .emergency-button { min-height: 36px; padding: 0 12px; border-color: transparent; }
 .emergency-panel { height: 100%; padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: white; }
 .emergency-panel h2 { margin-bottom: 20px; font-size: 18px; }
 .emergency-panel h2 small { margin-left: 8px; font-size: 12px; color: var(--muted); }
-.emergency-list { display: grid; gap: 10px; list-style: none; padding: 0; margin: 0; }
+.emergency-list { display: grid; gap: 10px; max-height: clamp(280px, 55dvh, 560px); overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; list-style: none; padding: 6px; margin: -6px; }
 .emergency-item { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px; text-align: left; border: 1px solid var(--border); border-radius: 8px; color: inherit; background: white; overflow-wrap: anywhere; }
 .emergency-item[aria-pressed='true'] { border-color: var(--primary); background: #f1f5ff; }
 .emergency-status { display: inline-block; padding: 4px 8px; border-radius: 5px; font-size: 12px; font-weight: 600; }
@@ -99,6 +99,10 @@
 .emergency-map-panel { display: flex; flex-direction: column; gap: 16px; }
 .emergency-map-panel h2 { margin-bottom: 0; }
 .emergency-map { position: relative; min-height: 420px; flex: 1; overflow: hidden; border-radius: 8px; background: #e2eae2; }
+.emergency-map-placeholder { display: flex; flex: 1; min-height: 420px; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 32px 24px; border: 1px dashed var(--border); border-radius: 8px; background: #f5f7fa; text-align: center; overflow-wrap: anywhere; }
+.emergency-map-placeholder svg { flex: none; color: var(--muted); }
+.emergency-map-placeholder strong { font-size: 18px; }
+.emergency-map-placeholder p { max-width: 34ch; color: var(--muted); font-size: 14px; line-height: 1.7; }
 
 .emergency-pin { width: 44px; height: 44px; border: 3px solid white; border-radius: 50%; color: white; font-weight: 700; background: var(--primary); }
 .emergency-pin.unconfirmed { background: var(--danger); }
